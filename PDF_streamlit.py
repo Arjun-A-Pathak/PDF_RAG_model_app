@@ -3,7 +3,6 @@ import streamlit as st
 from openai import OpenAI
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from langchain_community.document_loaders import PyPDFLoader
 from io import BytesIO
 
@@ -13,20 +12,16 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 1️⃣ Load text from PDF using LangChain's PDF loader
 def extract_pdf_text(uploaded_file):
-    # Save the uploaded PDF temporarily
     temp_path = "temp_uploaded.pdf"
     with open(temp_path, "wb") as f:
         f.write(uploaded_file.read())
 
-    # Use PyPDFLoader
     loader = PyPDFLoader(temp_path)
     docs = loader.load()
-
-    # Join all pages
     text = "\n".join([d.page_content for d in docs])
     return text
 
-# 2️⃣ Split text into chunks
+# 2️⃣ Split text into chunks (basic splitter)
 def chunk_text(text, chunk_size=500, overlap=50):
     words = text.split()
     chunks = []
@@ -35,24 +30,27 @@ def chunk_text(text, chunk_size=500, overlap=50):
         chunks.append(chunk)
     return chunks
 
-# 3️⃣ Embed text using sentence-transformers
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-
+# 3️⃣ Embed text using OpenAI
 def embed_texts(texts):
-    return embedder.encode(texts, normalize_embeddings=True)
+    response = client.embeddings.create(
+        model="text-embedding-3-small",  # light + fast
+        input=texts
+    )
+    embeddings = [e.embedding for e in response.data]
+    return np.array(embeddings, dtype=np.float32)
 
 # 4️⃣ Build FAISS index
 def build_faiss_index(chunks):
     embeddings = embed_texts(chunks)
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatIP(dimension)
-    index.add(np.array(embeddings, dtype=np.float32))
+    index.add(embeddings)
     return index, embeddings
 
 # 5️⃣ Retrieve relevant chunks
 def retrieve_chunks(query, chunks, index, k=3, threshold=0.3):
     query_emb = embed_texts([query])
-    distances, indices = index.search(np.array(query_emb, dtype=np.float32), k)
+    distances, indices = index.search(query_emb, k)
 
     retrieved = []
     for score, idx in zip(distances[0], indices[0]):
