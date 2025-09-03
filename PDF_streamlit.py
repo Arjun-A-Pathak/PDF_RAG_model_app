@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from openai import OpenAI
-from pypdf import PdfReader
+import fitz
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -11,13 +11,13 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 1️⃣ Extract text from PDF
-def extract_pdf_text(pdf_file):
-    reader = PdfReader(pdf_file)
+def extract_text_from_pdf(file):
+    doc = fitz.open(stream=file.read(), filetype="pdf")
     text = ""
-    for page in reader.pages:
-        if page.extract_text():
-            text += page.extract_text() + "\n"
+    for page in doc:
+        text += page.get_text()
     return text
+
 
 # 2️⃣ Split text into chunks
 def chunk_text(text, chunk_size=500, overlap=50):
