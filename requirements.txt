@@ -5,3 +5,4 @@ openai
 sentence-transformers
 scikit-learn
 pymupdf
+faiss-cpu
