@@ -6,3 +6,6 @@ sentence-transformers
 scikit-learn
 pymupdf
 faiss-cpu
+pypdf
+numpy
+langchain-community
