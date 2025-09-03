@@ -11,12 +11,18 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 1️⃣ Extract text from PDF
-def extract_text_from_pdf(file):
-    doc = fitz.open(stream=file.read(), filetype="pdf")
+def extract_pdf_text(pdf_file):
+    if hasattr(pdf_file, "read"):  # Streamlit uploaded file (BytesIO)
+        reader = PdfReader(pdf_file)
+    else:  # Local path string
+        reader = PdfReader(open(pdf_file, "rb"))
+
     text = ""
-    for page in doc:
-        text += page.get_text()
+    for page in reader.pages:
+        if page.extract_text():
+            text += page.extract_text() + "\n"
     return text
+
 
 
 # 2️⃣ Split text into chunks
