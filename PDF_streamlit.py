@@ -1,29 +1,30 @@
 import os
 import streamlit as st
 from openai import OpenAI
-import fitz
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from langchain_community.document_loaders import PyPDFLoader
+from io import BytesIO
 
 # 🔑 Initialize OpenAI client
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# 1️⃣ Extract text from PDF
-def extract_pdf_text(pdf_file):
-    if hasattr(pdf_file, "read"):  # Streamlit uploaded file (BytesIO)
-        reader = PdfReader(pdf_file)
-    else:  # Local path string
-        reader = PdfReader(open(pdf_file, "rb"))
+# 1️⃣ Load text from PDF using LangChain's PDF loader
+def extract_pdf_text(uploaded_file):
+    # Save the uploaded PDF temporarily
+    temp_path = "temp_uploaded.pdf"
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.read())
 
-    text = ""
-    for page in reader.pages:
-        if page.extract_text():
-            text += page.extract_text() + "\n"
+    # Use PyPDFLoader
+    loader = PyPDFLoader(temp_path)
+    docs = loader.load()
+
+    # Join all pages
+    text = "\n".join([d.page_content for d in docs])
     return text
-
-
 
 # 2️⃣ Split text into chunks
 def chunk_text(text, chunk_size=500, overlap=50):
@@ -97,14 +98,18 @@ uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
 if uploaded_file:
     with st.spinner("Extracting text and creating index..."):
         pdf_text = extract_pdf_text(uploaded_file)
-        chunks = chunk_text(pdf_text)
-        index, _ = build_faiss_index(chunks)
-    st.success("✅ PDF processed successfully!")
 
-    query = st.text_input("💡 Ask a question about the PDF:")
+        if not pdf_text.strip():
+            st.error("⚠️ No extractable text found in this PDF (might be scanned without OCR).")
+        else:
+            chunks = chunk_text(pdf_text)
+            index, _ = build_faiss_index(chunks)
+            st.success("✅ PDF processed successfully!")
 
-    if query:
-        with st.spinner("Thinking..."):
-            answer = ask_question(query, chunks, index)
-        st.markdown("### 📝 Answer:")
-        st.write(answer)
+            query = st.text_input("💡 Ask a question about the PDF:")
+
+            if query:
+                with st.spinner("Thinking..."):
+                    answer = ask_question(query, chunks, index)
+                st.markdown("### 📝 Answer:")
+                st.write(answer)
